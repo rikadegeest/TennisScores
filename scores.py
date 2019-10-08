@@ -1,3 +1,5 @@
+#%%
+urlDone = []
 
 #%%
 #programm to download and visualise tennis results of the dutch competition
@@ -10,23 +12,33 @@ import numpy as np
 
 matchList = []
 dayStatsList = []
+urlList = []
+session = requests.Session()
+
 
 #return soup file
 def setup():
     #to accept the toernooi.nl cookies
-    session = requests.Session()
     jar = requests.cookies.RequestsCookieJar()
     jar.set('st', 'l=1043&exp=44106.6793454745&c=1')
     session.cookies = jar
 
     #setup url
-    url = 'https://mijnknltb.toernooi.nl/league/02DF7F50-680B-493A-8804-0045BA39675E/team-match/2992'
+    startUrl = 'https://mijnknltb.toernooi.nl/league/02DF7F50-680B-493A-8804-0045BA39675E/team/418'
+    res = session.get(startUrl)
+    res.raise_for_status()
+
+    #get the temptempMatches in a soup
+    soup = BeautifulSoup(res.text, 'html.parser')
+    return(soup)
+
+#makes soup of url
+def soupUrl(url):
     res = session.get(url)
     res.raise_for_status()
 
     #get the temptempMatches in a soup
     soup = BeautifulSoup(res.text, 'html.parser')
-    
     return(soup)
 
 #get whether match is single's or doubles
@@ -38,6 +50,7 @@ def singleOrDouble(match_name):
 
 #gets the stats of the day
 def getDayStats(soup):
+    dayStats = {}
     match_day = soup.find('div', class_ = "team-match-header module module--dark module--card")
 
     classe = match_day.find('a').text
@@ -60,7 +73,6 @@ def getDayStats(soup):
 
     dayStatsList.append(dayStats)
 
-    
 #gets all temptempMatches played on a day
 def getMatches(soup):
     #temptempMatches
@@ -128,9 +140,42 @@ def getMatches(soup):
                 tempMatches['player2_won'] = player2_won
         matchList.append(tempMatches)
 
+#fils urlList with the url of every play day for a single team
+def getOneTeamDaysUrls(soup):
+    temp = soup.findAll('li', class_ ='match-group__item')
+    for x in temp:
+        #checks wheter day is played
+        if x.find('div', class_='is-not-played') == None:
+            url = 'https://mijnknltb.toernooi.nl' + x.find('a', class_ ='team-match__wrapper')['href']
+            if (checkUrlScraped):
+                urlList.append(url)
+            else:
+                break
+        else:
+            break
+
+def checkUrlScraped(url):
+    if url in urlDone:
+        return True
+    else:
+        return False
+
+#get stats and matches every url in urlList
+def getOneTeamStatsAndMatches():
+    for url in urlList:
+        soup = soupUrl(url)
+        urlList.remove(url)
+        getDayStats(soup)
+        getMatches(soup)
+        urlDone.append(url)
+
 soup = setup()
-getDayStats(soup)
-getMatches(soup)
+#getOneTeamDaysUrls(soup)
+#getOneTeamStatsAndMatches()
+#getOneTeamDaysUrls(soup)
+#getDayStats(soup)
+#getMatches(soup)
+
 
 
 #%%
