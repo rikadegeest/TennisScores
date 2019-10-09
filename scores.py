@@ -15,7 +15,6 @@ dayStatsList = []
 urlList = []
 session = requests.Session()
 
-
 #return soup file
 def setup():
     #to accept the toernooi.nl cookies
@@ -62,13 +61,32 @@ def getDayStats(soup):
     sets = match_day.findAll('span', class_ = 'module__footer-item-value')[1].text
     games = match_day.findAll('span', class_ = 'module__footer-item-value')[2].text
 
+    score_team1 = score[:1]
+    score_team2 = score[-1:]
+
+    if len(sets) == 5:
+        sets_team_1 = sets[:1]
+        sets_team_2 = sets[-1:]
+    if len(sets) == 6:
+        if sets.find('-') == 3:
+            sets_team_1 = sets[:2]
+            sets_team_2 = sets[-1:]
+        else:
+            sets_team_1 = sets[:1]
+            sets_team_2 = sets[-2:]
+    else:
+        sets_team_1 = sets[:2]
+        sets_team_2 = sets[-2:]
+
     dayStats['league'] = classe
     dayStats['date'] = date
     dayStats['home_team'] = home_team
     dayStats['away_team'] = away_team
     dayStats['begin_time'] = begin_time
-    dayStats['score'] = score
-    dayStats['sets'] = sets
+    dayStats['score_team_1'] = score_team1
+    dayStats['score_team_2'] = score_team2
+    dayStats['sets_team_1'] = sets_team_1
+    dayStats['sets_team_2'] = sets_team_2
     dayStats['games'] = games
 
     dayStatsList.append(dayStats)
@@ -90,7 +108,10 @@ def getMatches(soup):
             player2_name = match.findAll('div', class_ = "match__row")[1].find('span',class_ = 'nav-link__value').text
 
             tempMatches['home_team_player1'] = player1_name
+            tempMatches['home_team_player2'] = None
             tempMatches['away_team_player1'] = player2_name
+            tempMatches['away_team_player2'] = None
+
         else:
             player1_name = match.findAll('div', class_ = "match__row")[0].findAll('span',class_ = 'nav-link__value')[0].text
             player2_name = match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[0].text
@@ -114,8 +135,8 @@ def getMatches(soup):
             player1_set_scores[i] = player1_set_scores[i].text
             player2_set_scores[i] = player2_set_scores[i].text
 
-            temp1 = 'team1_set' + str(i)
-            temp2 = 'team2_set' + str(i)
+            temp1 = 'team1_set' + str(i + 1)
+            temp2 = 'team2_set' + str(i + 1)
             tempMatches[temp1] = player1_set_scores[i]
             tempMatches[temp2] = player2_set_scores[i]
 
@@ -124,6 +145,7 @@ def getMatches(soup):
             if singleOrDouble(match_name):
                 player_won = player1_name
                 tempMatches['player1_won'] = player_won
+                tempMatches['player2_won'] = None
             else:
                 player1_won = player1_name
                 player2_won = player12_name
@@ -133,6 +155,8 @@ def getMatches(soup):
             if singleOrDouble(match_name):
                 player_won = player2_name
                 tempMatches['player1_won'] = player_won
+                tempMatches['player2_won'] = player_won
+
             else:
                 player1_won = player2_name
                 player2_won = player22_name
@@ -154,6 +178,7 @@ def getOneTeamDaysUrls(soup):
         else:
             break
 
+#checks if url is already scraped
 def checkUrlScraped(url):
     if url in urlDone:
         return True
@@ -170,12 +195,45 @@ def getOneTeamStatsAndMatches():
         urlDone.append(url)
 
 soup = setup()
-#getOneTeamDaysUrls(soup)
-#getOneTeamStatsAndMatches()
-#getOneTeamDaysUrls(soup)
-#getDayStats(soup)
-#getMatches(soup)
+getOneTeamDaysUrls(soup)
+getOneTeamStatsAndMatches()
 
+#%%
+#this cell is to clean the code
+from datetime import datetime as dt
+
+def parse_maybe_int(i):
+    if i == '':
+        return None
+    else:
+        return int(i)
+
+def parse_date(date):
+    return dt.strptime(date, '%Y-%m-%d')
+
+for match in matchList:
+    match['team1_set1'] = parse_maybe_int(match['team1_set1'])
+    match['team1_set2'] = parse_maybe_int(match['team1_set2'])
+    match['team2_set1'] = parse_maybe_int(match['team1_set1'])
+    match['team2_set2'] = parse_maybe_int(match['team2_set2'])
+    if 'team1_set3' in match:
+        match['team1_set3'] = parse_maybe_int(match['team1_set3'])
+        match['team2_set3'] = parse_maybe_int(match['team2_set3'])    
+    else:
+        None
+
+
+#%%
+import csv
+
+csv_columns = ['match_name', 'home_team_player1', 'home_team_player2', 'away_team_player1', 'away_team_player2', 'team1_set1', 'team2_set1', 'team1_set2', 'team2_set2','team1_set3', 'team2_set3' 'player1_won', 'player2_won']
+with open('matches.csv', 'w') as csvfile:
+        writer = csv.DictWriter(csvfile)
+        writer.writeheader()
+        for match in matchList:
+            writer.writerow(match)
+
+writer.close()
 
 
 #%%
