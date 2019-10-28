@@ -1,7 +1,29 @@
 #%%
 #TODO: fix walkovers
+import numpy as pd
+url_done = pd.read_csv("url_done.csv") 
 
-url_done = []
+#%%
+#cell to extract javascript based pages
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+def get_selenium_html_source(url):
+    
+    browser = webdriver.Chrome('/Users/rik/Downloads/chromedriver')
+    browser.get(url)
+    try:
+        a = WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.ID, "tabcontent"))
+        )
+        html = browser.page_source
+        soup = BeautifulSoup(html)
+    finally:
+        browser.quit()
+    return soup
+
 
 #%%
 #programm to download and visualise tennis results of the dutch competition
@@ -10,6 +32,7 @@ url_done = []
 import requests
 from bs4 import BeautifulSoup
 import numpy as np 
+import time
 
 
 match_list = [["match_name", "home_team_player_1", "home_team_player_2", "away_team_player_1", "away_team_player_2", "team1_set_1", "team1_set_2", "team1_set_3", "team2_set_1","team2_set_2", "team2_set_3", "player1_won", "player2_won"]]
@@ -36,7 +59,9 @@ def soup_url(url):
     res = session.get(url)
     res.raise_for_status()
 
-    #get the temptempMatches in a soup
+    #get the Matches in a soup
+    soup = BeautifulSoup(res.text, 'html.parser')
+    time.sleep(10)
     soup = BeautifulSoup(res.text, 'html.parser')
     return(soup)
 
@@ -87,7 +112,8 @@ def get_matches(soup):
     for match in match:
         #grabs which match it is (he1, hd2, etc.)
         match_name = match.find('div', class_ = "match__header-title-main").find('span', class_ = 'nav-link__value').text
-
+        print(match_name)
+        
         if match.findAll('div', class_ = "match__row")[0].find('span',class_ = 'nav-link__value') is not None:
             player1_name = match.findAll('div', class_ = "match__row")[0].findAll('span',class_ = 'nav-link__value')[0].text
             player2_name = match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[0].text
@@ -190,7 +216,6 @@ def get_one_competition_team_urls(soup):
             temp_list.append(url)
     return temp_list
 
-
 #gets data from every team and every playdate in entire competition
 def get_competition_data(soup):
     url_list = get_one_competition_team_urls(soup)
@@ -199,9 +224,27 @@ def get_competition_data(soup):
         team_url_list = get_one_team_days_urls(soup)
         get_one_team_stats_and_matches(team_url_list)
 
-startUrl = 'https://mijnknltb.toernooi.nl/league/02DF7F50-680B-493A-8804-0045BA39675E/draw/63'
+#gets every team from a club
+def get_club_team_urls(soup):
+    match_groups = soup.findAll('div', class_='match-group')
+    temp_url_list = []
+    for match in match_groups:
+        temp = match.find('ul', class_='list')
+        teams = temp.findAll('li', class_='list__item', recursive=False)
+        for team in teams:
+            url = 'https://mijnknltb.toernooi.nl' + team.find('a')['href']
+            temp_url_list.append(url)
+
+    for temp_url in temp_url_list:
+        soup = soup_url(temp_url)
+        get_competition_data(soup)
+
+
+startUrl = 'https://mijnknltb.toernooi.nl/league/02DF7F50-680B-493A-8804-0045BA39675E/club/1064/Index/teams'
 soup = setup(startUrl)
-get_competition_data(soup)
+soup = get_selenium_html_source(startUrl)
+get_club_team_urls(soup)
+#get_competition_data(soup)
 
 #url_list = get_one_team_days_urls(soup)
 #get_one_team_stats_and_matches(url_list)
@@ -213,6 +256,9 @@ with open("matches.csv", "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerows(match_list)
 
+with open("url_done.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerows(url_done)
 
 
 
