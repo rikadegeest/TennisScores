@@ -1,7 +1,26 @@
 #%%
+#programm to download tennis results of the dutch competition
+
 #TODO: fix walkovers
-import numpy as pd
-url_done = pd.read_csv("url_done.csv") 
+import csv
+import requests
+
+#url_done = pd.read_csv("url_done.csv")
+url_done = []
+
+with open('url_list.csv', 'r') as f:
+    reader = csv.reader(f)
+    match_url_list = list(reader)
+url_with_error = []
+
+x= 0
+for url in match_url_list:
+    tempstr = ''.join(url)
+    match_url_list[x] = tempstr
+    x+=1
+
+session = requests.Session()
+
 
 #%%
 #cell to extract javascript based pages
@@ -11,7 +30,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 def get_selenium_html_source(url):
-    
     browser = webdriver.Chrome('/Users/rik/Downloads/chromedriver')
     browser.get(url)
     try:
@@ -24,12 +42,9 @@ def get_selenium_html_source(url):
         browser.quit()
     return soup
 
-
 #%%
-#programm to download and visualise tennis results of the dutch competition
 
 #setup
-import requests
 from bs4 import BeautifulSoup
 import numpy as np 
 import time
@@ -37,7 +52,6 @@ import time
 
 match_list = [["match_name", "home_team_player_1", "home_team_player_2", "away_team_player_1", "away_team_player_2", "team1_set_1", "team1_set_2", "team1_set_3", "team2_set_1","team2_set_2", "team2_set_3", "player1_won", "player2_won"]]
 day_stats_list = [["classe", "date", "home_team", "away_team", "begin_time","score", "sets", "games"]]
-session = requests.Session()
 
 #return soup file from the starting url
 def setup(url):
@@ -86,11 +100,12 @@ def check_sets_played(player_set_scores):
     else:
         return 2
 
-
 #gets the stats of the day
 def get_day_stats(soup):
     match_day = soup.find('div', class_ = "team-match-header module module--dark module--card")
-
+    
+    if(match_day == None):
+        raise Exception(soup)
     #gets information from html
     classe = match_day.find('a').text
     date = match_day.find('div', class_='text--xsmall').time.text
@@ -112,63 +127,67 @@ def get_matches(soup):
     for match in match:
         #grabs which match it is (he1, hd2, etc.)
         match_name = match.find('div', class_ = "match__header-title-main").find('span', class_ = 'nav-link__value').text
-        print(match_name)
-        
+
         if match.findAll('div', class_ = "match__row")[0].find('span',class_ = 'nav-link__value') is not None:
-            player1_name = match.findAll('div', class_ = "match__row")[0].findAll('span',class_ = 'nav-link__value')[0].text
-            player2_name = match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[0].text
+            if match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[0].text != None:
 
-            if single_or_double(match_name):
-                home_team_player_1 = player1_name
-                home_team_player_2 = ""
-                away_team_player_1 = player2_name
-                away_team_player_2 = ""
+                player1_name = match.findAll('div', class_ = "match__row")[0].findAll('span',class_ = 'nav-link__value')[0].text
+                player2_name = match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[0].text
 
-            else:
-                player12_name = match.findAll('div', class_ = "match__row")[0].findAll('span',class_ = 'nav-link__value')[1].text
-                player22_name = match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[1].text
+                if single_or_double(match_name):
+                    home_team_player_1 = player1_name
+                    home_team_player_2 = ""
+                    away_team_player_1 = player2_name
+                    away_team_player_2 = ""
 
-                home_team_player_1 = player1_name
-                home_team_player_2 = player12_name
-                away_team_player_1 = player2_name
-                away_team_player_2 = player22_name
-
-
-            player1_set_scores = match.findAll('div', class_ = "match__row")[0]
-            player2_set_scores = match.findAll('div', class_ = "match__row")[1]
-
-            #check if walkover
-            if player1_set_scores.find('li', class_='points__cell') is not None:
-                player1_set_scores = player1_set_scores.findAll('li', class_='points__cell')
-                player2_set_scores = player2_set_scores.findAll('li', class_='points__cell')
-
-                for i in range(len(player1_set_scores)):
-                    player1_set_scores[i-1] = player1_set_scores[i-1].text
-                    player2_set_scores[i-1] = player2_set_scores[i-1].text
-
-                if len(player1_set_scores) == 2:
-                    empty_var = ""
-                    player1_set_scores.append(empty_var)
-                    player2_set_scores.append(empty_var)
-
-                #checks winner
-                if int(player1_set_scores[check_sets_played(player1_set_scores)]) > int(player2_set_scores[check_sets_played(player1_set_scores)]):
-                    if single_or_double(match_name):
-                        player1_won = player1_name
-                        player2_won = ""
-                    else:
-                        player1_won = player1_name
-                        player2_won = player12_name
                 else:
-                    if single_or_double(match_name):
-                        player1_won = player2_name
-                        player2_won = ""
+                    player12_name = match.findAll('div', class_ = "match__row")[0].findAll('span',class_ = 'nav-link__value')[1].text
+                    player22_name = match.findAll('div', class_ = "match__row")[1].findAll('span',class_ = 'nav-link__value')[1].text
+
+                    home_team_player_1 = player1_name
+                    home_team_player_2 = player12_name
+                    away_team_player_1 = player2_name
+                    away_team_player_2 = player22_name
+
+
+                player1_set_scores = match.findAll('div', class_ = "match__row")[0]
+                player2_set_scores = match.findAll('div', class_ = "match__row")[1]
+
+                #check if walkover
+                if player1_set_scores.find('li', class_='points__cell') is not None:
+                    player1_set_scores = player1_set_scores.findAll('li', class_='points__cell')
+                    player2_set_scores = player2_set_scores.findAll('li', class_='points__cell')
+
+                    for i in range(len(player1_set_scores)):
+                        player1_set_scores[i-1] = player1_set_scores[i-1].text
+                        player2_set_scores[i-1] = player2_set_scores[i-1].text
+
+                    if len(player1_set_scores) == 2:
+                        empty_var = ""
+                        player1_set_scores.append(empty_var)
+                        player2_set_scores.append(empty_var)
+
+                    #checks winner
+                    if int(player1_set_scores[check_sets_played(player1_set_scores)]) > int(player2_set_scores[check_sets_played(player1_set_scores)]):
+                        if single_or_double(match_name):
+                            player1_won = player1_name
+                            player2_won = ""
+                        else:
+                            player1_won = player1_name
+                            player2_won = player12_name
                     else:
-                        player1_won = player2_name
-                        player2_won = player22_name
-                
-                matchStats = [match_name, home_team_player_1, home_team_player_2, away_team_player_1, away_team_player_2, player1_set_scores[0],player1_set_scores[1],player1_set_scores[2],player2_set_scores[0], player2_set_scores[1], player2_set_scores[2], player1_won, player2_won]
-                match_list.append(matchStats)
+                        if single_or_double(match_name):
+                            player1_won = player2_name
+                            player2_won = ""
+                        else:
+                            player1_won = player2_name
+                            player2_won = player22_name
+                    
+                    matchStats = [match_name, home_team_player_1, home_team_player_2, away_team_player_1, away_team_player_2, player1_set_scores[0],player1_set_scores[1],player1_set_scores[2],player2_set_scores[0], player2_set_scores[1], player2_set_scores[2], player1_won, player2_won]
+                    match_list.append(matchStats)
+                #gekke error waar ik nog naar moet kijken
+                else:
+                    None
             else:
                 #walkover
                 None
@@ -176,53 +195,50 @@ def get_matches(soup):
             #walkover
             None
                   
-        
-
 #get stats and matches every url in urlList
-def get_one_team_stats_and_matches(url_list):
+def get_stats_and_matches(url_list):
     for url in url_list:
         if check_url_scraped(url):
             None
         else:
             soup = soup_url(url)
-            get_day_stats(soup)
+            try:
+                get_day_stats(soup)
+            except Exception as err:
+                url_with_error.append(url)
             get_matches(soup)
             url_done.append(url)
 
 #fils urlList with the url of every play day for a single team
-def get_one_team_days_urls(soup):
+def get_one_team_days_urls(url_list):
     temp_url_list = []
-    temp = soup.findAll('li', class_ ='match-group__item')
-    for x in temp:
-        #checks wheter day is played
-        if x.find('div', class_='is-not-played') == None:
-            url = 'https://mijnknltb.toernooi.nl' + x.find('a', class_ ='team-match__wrapper')['href']
-            if (check_url_scraped):
-                temp_url_list.append(url)
+    for url in url_list:
+        soup = soup_url(url)
+        temp = soup.findAll('li', class_ ='match-group__item')
+        for x in temp:
+            #checks wheter day is played
+            if x.find('div', class_='is-not-played') == None:
+                url = 'https://mijnknltb.toernooi.nl' + x.find('a', class_ ='team-match__wrapper')['href']
+                if (check_url_scraped):
+                    temp_url_list.append(url)
+                else:
+                    None
             else:
                 None
-        else:
-            None
     return temp_url_list
 
 #gets url of every team in competition
-def get_one_competition_team_urls(soup):
-    match_table = soup.find('table', class_='table--new')
-    teams = match_table.findAll('tr')
-    teams = teams[1:]
+def get_one_competition_team_urls(url_list):
     temp_list = []
-    for team in teams:
-            url = 'https://mijnknltb.toernooi.nl' + team.find('a')['href']
-            temp_list.append(url)
-    return temp_list
-
-#gets data from every team and every playdate in entire competition
-def get_competition_data(soup):
-    url_list = get_one_competition_team_urls(soup)
     for url in url_list:
         soup = soup_url(url)
-        team_url_list = get_one_team_days_urls(soup)
-        get_one_team_stats_and_matches(team_url_list)
+        match_table = soup.find('table', class_='table--new')
+        teams = match_table.findAll('tr')
+        teams = teams[1:]
+        for team in teams:
+                url = 'https://mijnknltb.toernooi.nl' + team.find('a')['href']
+                temp_list.append(url)
+    return temp_list
 
 #gets every team from a club
 def get_club_team_urls(soup):
@@ -234,16 +250,14 @@ def get_club_team_urls(soup):
         for team in teams:
             url = 'https://mijnknltb.toernooi.nl' + team.find('a')['href']
             temp_url_list.append(url)
-
-    for temp_url in temp_url_list:
-        soup = soup_url(temp_url)
-        get_competition_data(soup)
+    return temp_url_list
 
 
-startUrl = 'https://mijnknltb.toernooi.nl/league/02DF7F50-680B-493A-8804-0045BA39675E/club/1064/Index/teams'
-soup = setup(startUrl)
-soup = get_selenium_html_source(startUrl)
-get_club_team_urls(soup)
+
+#startUrl = 'https://mijnknltb.toernooi.nl/league/02DF7F50-680B-493A-8804-0045BA39675E/club/1064/Index/teams'
+#soup = setup(startUrl)
+#soup = get_selenium_html_source(startUrl)
+#club_team_urls = get_club_team_urls(soup)
 #get_competition_data(soup)
 
 #url_list = get_one_team_days_urls(soup)
@@ -256,11 +270,13 @@ with open("matches.csv", "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerows(match_list)
 
+#%%
+import csv
 with open("url_done.csv", "w", newline="") as f:
     writer = csv.writer(f)
-    writer.writerows(url_done)
+    writer.writerows(club_team_urls)
 
-
+#%%
 
 
 

@@ -11,8 +11,10 @@ players = pd.DataFrame(index = (matches.loc[:,'home_team_player_1':'away_team_pl
 players['matches_played'] = matches.loc[:,'home_team_player_1':'away_team_player_2'].melt()['value'].value_counts()
 players['matches_won'] = matches.loc[:,['player1_won', 'player2_won']].melt()['value'].value_counts()
 players['percentage_won'] = round(players['matches_won'] / players['matches_played'] * 100, 2)
+
 #drops random empty row
 players = players.dropna(how='all')
+
 #fill in 0 when no matches were won
 players = players.fillna(0)
 players.sort_values(by=['percentage_won'], ascending=False)
